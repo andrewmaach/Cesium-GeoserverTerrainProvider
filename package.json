@@ -1,0 +1,23 @@
+{
+  "name": "cesium-geoserverterrainprovider",
+  "version": "1.0.0",
+  "description": "cesium-GeoserverTerrainProvider ================",
+  "main": "GeoserverTerrainProvider.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrewmaach/Cesium-GeoserverTerrainProvider.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/andrewmaach/Cesium-GeoserverTerrainProvider/issues"
+  },
+  "homepage": "https://github.com/andrewmaach/Cesium-GeoserverTerrainProvider#readme",
+  "dependencies": {
+    "cesium": "^1.41.0",
+    "when": "^3.7.8"
+  }
+}

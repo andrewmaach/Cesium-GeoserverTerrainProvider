@@ -1,8 +1,24 @@
-(function() {
+import defined from 'cesium/Core/defined';
+import defaultValue from 'cesium/Core/defaultValue';
+import Ellipsoid from 'cesium/Core/Ellipsoid';
+import WebMercatorTilingScheme from 'cesium/Core/WebMercatorTilingScheme';
+import loadXML from 'cesium/Core/loadXML';
+import loadArrayBuffer from 'cesium/Core/loadArrayBuffer';
+import Rectangle from 'cesium/Core/Rectangle';
+import loadImage from 'cesium/Core/loadImage';
+import GeographicTilingScheme from 'cesium/Core/GeographicTilingScheme';
+import DeveloperError from 'cesium/Core/DeveloperError';
+import Credit from 'cesium/Core/Credit';
+import CesiumEvent from 'cesium/Core/Event';
+import defineProperties from 'cesium/Core/defineProperties';
+import HeightmapTerrainData from 'cesium/Core/HeightmapTerrainData';
+import getImagePixels from 'cesium/Core/getImagePixels';
+import TerrainProvider from 'cesium/Core/TerrainProvider';
+import when from 'when';
+
+
+export default (function() {
     var OGCHelper = {};
-    var loadXML=Cesium.loadXML===undefined?Cesium.Resource.fetchXML:Cesium.loadXML;
-    var loadArrayBuffer=Cesium.loadArrayBuffer===undefined?Cesium.Resource.fetchArrayBuffer:Cesium.loadArrayBuffer;
-    var loadImage=Cesium.loadImage===undefined?Cesium.Resource.fetchImage:Cesium.loadImage;
     var intersectionRectangle = function(rectangle0, rectangle1) {
         var west = Math.max(rectangle0.west, rectangle1.west);
         var east = Math.min(rectangle0.east, rectangle1.east);
@@ -12,7 +28,7 @@
         if ((east <= west) || (south >= north)) {
             resultat = undefined;
         } else {
-            resultat = new Cesium.Rectangle(west, south, east, north);
+            resultat = new Rectangle(west, south, east, north);
         }
         return resultat;
     };
@@ -21,27 +37,27 @@
      */
     OGCHelper.CRS = [{
         name: "CRS:84",
-        ellipsoid: Cesium.Ellipsoid.WGS84,
+        ellipsoid: Ellipsoid.WGS84,
         firstAxeIsLatitude: false,
-        tilingScheme: Cesium.GeographicTilingScheme,
+        tilingScheme: GeographicTilingScheme,
         supportedCRS: "urn:ogc:def:crs:OGC:2:84"
     }, {
         name: "EPSG:4326",
-        ellipsoid: Cesium.Ellipsoid.WGS84,
+        ellipsoid: Ellipsoid.WGS84,
         firstAxeIsLatitude: true,
-        tilingScheme: Cesium.GeographicTilingScheme,
+        tilingScheme: GeographicTilingScheme,
         SupportedCRS: "urn:ogc:def:crs:EPSG::4326"
     }, {
         name: "EPSG:3857",
-        ellipsoid: Cesium.Ellipsoid.WGS84,
+        ellipsoid: Ellipsoid.WGS84,
         firstAxeIsLatitude: false,
-        tilingScheme: Cesium.WebMercatorTilingScheme,
+        tilingScheme: WebMercatorTilingScheme,
         SupportedCRS: "urn:ogc:def:crs:EPSG::3857"
     }, {
         name: "OSGEO:41001",
-        ellipsoid: Cesium.Ellipsoid.WGS84,
+        ellipsoid: Ellipsoid.WGS84,
         firstAxeIsLatitude: false,
-        tilingScheme: Cesium.WebMercatorTilingScheme,
+        tilingScheme: WebMercatorTilingScheme,
         SupportedCRS: "urn:ogc:def:crs:EPSG::3857"
     }];
 
@@ -165,8 +181,8 @@
      */
     OGCHelper.parser = function(description) {
         var resultat;
-        description = Cesium.defaultValue(description,
-            Cesium.defaultValue.EMPTY_OBJECT);
+        description = defaultValue(description,
+            defaultValue.EMPTY_OBJECT);
         switch (description.service) {
             case "TMS":
                 resultat = OGCHelper.TMSParser.generate(description);
@@ -182,9 +198,9 @@
 
     OGCHelper.WMSParser.generate = function(description) {
         var resultat;
-        description = Cesium.defaultValue(description,
-            Cesium.defaultValue.EMPTY_OBJECT);
-        if (Cesium.defined(description.url)) {
+        description = defaultValue(description,
+            defaultValue.EMPTY_OBJECT);
+        if (defined(description.url)) {
             var urlofServer = description.url;
             var index = urlofServer.lastIndexOf("?");
             if (index > -1) {
@@ -192,16 +208,16 @@
             }
             var urlGetCapabilities = urlofServer +
                 '?SERVICE=WMS&REQUEST=GetCapabilities&tiled=true';
-            if (Cesium.defined(description.proxy)) {
+            if (defined(description.proxy)) {
                 urlGetCapabilities = description.proxy.getURL(urlGetCapabilities);
             }
-            resultat = Cesium.when(loadXML(urlGetCapabilities), function(xml) {
+            resultat = when(loadXML(urlGetCapabilities), function(xml) {
                 return OGCHelper.WMSParser.getMetaDatafromXML(xml, description);
             });
-        } else if (Cesium.defined(description.xml)) {
+        } else if (defined(description.xml)) {
             resultat = OGCHelper.WMSParser.getMetaDatafromXML(description.xml, description);
         } else {
-            throw new Cesium.DeveloperError(
+            throw new DeveloperError(
                 'either description.url or description.xml are required.');
         }
         return resultat;
@@ -209,20 +225,20 @@
 
     OGCHelper.WMSParser.getMetaDatafromXML = function(xml, description) {
         if (!(xml instanceof XMLDocument)) {
-            throw new Cesium.DeveloperError('xml must be a XMLDocument');
+            throw new DeveloperError('xml must be a XMLDocument');
         }
         // get version of wms 1.1.X or 1.3.X=> for 1.3 use firstAxe for order of
         // CRS
-        if (!Cesium.defined(description.layerName)) {
-            throw new Cesium.DeveloperError(
+        if (!defined(description.layerName)) {
+            throw new DeveloperError(
                 'description.layerName is required.');
         }
         var resultat = {};
         var layerName = description.layerName;
-        var maxLevel = Cesium.defaultValue(description.maxLevel, 11);
+        var maxLevel = defaultValue(description.maxLevel, 11);
         var version = undefined;
-        resultat.heightMapWidth = Cesium.defaultValue(description.heightMapWidth, 65);
-        resultat.heightMapHeight = Cesium.defaultValue(description.heightMapHeight, resultat.heightMapWidth);
+        resultat.heightMapWidth = defaultValue(description.heightMapWidth, 65);
+        resultat.heightMapHeight = defaultValue(description.heightMapHeight, resultat.heightMapWidth);
         var requestedSize = {
             width: 65,
             height: 65
@@ -235,15 +251,15 @@
         var isNewVersion = undefined;
         resultat.ready = false;
         resultat.levelZeroMaximumGeometricError = undefined;
-        resultat.waterMask = Cesium.defaultValue(description.waterMask, false);
+        resultat.waterMask = defaultValue(description.waterMask, false);
         if (typeof(resultat.waterMask) !== "boolean") {
             resultat.waterMask = false;
         }
-        resultat.offset = Cesium.defaultValue(description.offset, 0);
-        resultat.highest = Cesium.defaultValue(description.highest, 12000);
-        resultat.lowest = Cesium.defaultValue(description.lowest, -500);
+        resultat.offset = defaultValue(description.offset, 0);
+        resultat.highest = defaultValue(description.highest, 12000);
+        resultat.lowest = defaultValue(description.lowest, -500);
         var styleName = description.styleName;
-        resultat.hasStyledImage = Cesium.defaultValue(description.hasStyledImage, typeof(description.styleName) === "string");
+        resultat.hasStyledImage = defaultValue(description.hasStyledImage, typeof(description.styleName) === "string");
         // get version
         var versionNode = xml.querySelector("[version]");
         if (versionNode !== null) {
@@ -256,15 +272,15 @@
         if (index > -1) {
             url = url.substring(0, index);
         }
-        if (Cesium.defined(description.proxy)) {
+        if (defined(description.proxy)) {
             url = description.proxy.getURL(url);
         }
 
         // get list of map format
         var nodeFormats = xml.querySelectorAll("Request>GetMap>Format");
 
-        if (!Cesium.defined(resultat.formatImage)) {
-            for (var j = 0; j < nodeFormats.length && !Cesium.defined(resultat.formatArray); j++) {
+        if (!defined(resultat.formatImage)) {
+            for (var j = 0; j < nodeFormats.length && !defined(resultat.formatArray); j++) {
                 var OGCAvailables = OGCHelper.FormatArray.filter(function(elt) {
                     return elt.format === nodeFormats[j].textContent;
                 });
@@ -273,7 +289,7 @@
                 }
             }
         }
-        if (Cesium.defined(resultat.formatArray) &&
+        if (defined(resultat.formatArray) &&
             typeof(resultat.formatArray.format) === "string" &&
             typeof(resultat.formatArray.postProcessArray) === "function") {
             resultat.formatArray.terrainDataStructure = {
@@ -290,7 +306,7 @@
             resultat.formatArray = undefined;
         }
         // a formatImage should always exist !!
-        for (var j = 0; j < nodeFormats.length && !Cesium.defined(resultat.formatImage); j++) {
+        for (var j = 0; j < nodeFormats.length && !defined(resultat.formatImage); j++) {
             var OGCAvailables = OGCHelper.FormatImage.filter(function(elt) {
                 return elt.format === nodeFormats[j].textContent;
             });
@@ -298,7 +314,7 @@
                 resultat.formatImage = OGCAvailables[0];
             }
         }
-        if (Cesium.defined(resultat.formatImage) &&
+        if (defined(resultat.formatImage) &&
             typeof(resultat.formatImage.format) === "string") {
             resultat.formatImage.terrainDataStructure = {
                 heightScale: 1.0,
@@ -316,17 +332,17 @@
         var layerNodes = xml
             .querySelectorAll("Layer[queryable='1'],Layer[queryable='true']");
         var layerNode;
-        for (var m = 0; m < layerNodes.length && !Cesium.defined(layerNode); m++) {
+        for (var m = 0; m < layerNodes.length && !defined(layerNode); m++) {
             if (layerNodes[m].querySelector("Name").textContent === layerName) {
                 layerNode = layerNodes[m];
                 var fixedHeight = layerNode.getAttribute("fixedHeight");
                 var fixedWidth = layerNode.getAttribute("fixedWidth");
-                if (Cesium.defined(fixedHeight)) {
+                if (defined(fixedHeight)) {
                     fixedHeight = parseInt(fixedHeight);
                     resultat.heightMapHeight = fixedHeight > 0 && fixedHeight < resultat.heightMapHeight ? fixedHeight : resultat.heightMapHeight;
                     requestedSize.height = fixedHeight > 0 ? fixedHeight : requestedSize.height;
                 }
-                if (Cesium.defined(fixedWidth)) {
+                if (defined(fixedWidth)) {
                     fixedWidth = parseInt(fixedWidth);
                     resultat.heightMapWidth = fixedWidth > 0 && fixedWidth < resultat.heightMapWidth ? fixedWidth : resultat.heightMapWidth;
                     requestedSize.width = fixedWidth > 0 ? fixedWidth : requestedSize.width;
@@ -334,7 +350,7 @@
             }
         }
 
-        if (Cesium.defined(layerNode) && Cesium.defined(version)) {
+        if (defined(layerNode) && defined(version)) {
             var found = false;
             for (var n = 0; n < OGCHelper.CRS.length && !found; n++) {
                 var CRSSelected = OGCHelper.CRS[n];
@@ -362,13 +378,13 @@
                         south = parseFloat(nodeBBox.getAttribute("miny"));
                         north = parseFloat(nodeBBox.getAttribute("maxy"));
                     }
-                    var rectReference = new Cesium.Rectangle(west, south, east, north);
+                    var rectReference = new Rectangle(west, south, east, north);
                     resultat.getTileDataAvailable = function(x, y, level) {
                         var retour = false;
                         var rectangleCalcul = resultat.tilingScheme.tileXYToNativeRectangle(x, y, level);
                         if (level < maxLevel) {
                             var scratchRectangle = intersectionRectangle(rectReference, rectangleCalcul);
-                            retour = Cesium.defined(scratchRectangle);
+                            retour = defined(scratchRectangle);
                         }
                         return retour;
                     };
@@ -376,7 +392,7 @@
                 }
             }
             // style défini et existant?
-            if (Cesium.defined(styleName)) {
+            if (defined(styleName)) {
                 var styleNodes = layerNode.querySelectorAll("Style>Name");
                 var styleFound = false;
                 for (var z = 0; z < styleNodes.length && !styleFound; z++) {
@@ -404,8 +420,8 @@
             }
 
             resultat.ready = found &&
-                (Cesium.defined(resultat.formatImage) || Cesium.defined(resultat.formatArray)) &&
-                Cesium.defined(version);
+                (defined(resultat.formatImage) || defined(resultat.formatArray)) &&
+                defined(version);
         }
 
         if (resultat.ready) {
@@ -419,7 +435,7 @@
 
             if (resultat.formatImage) {
                 var URLtemplateImage = URLtemplate + '&format=' + resultat.formatImage.format + '&width=' + requestedSize.width + '&height=' + requestedSize.height;
-                if (Cesium.defined(styleName)) {
+                if (defined(styleName)) {
                     URLtemplateImage += "&styles=" + styleName + "&style=" + styleName;
                 }
                 resultat.URLtemplateImage = function() {
@@ -441,16 +457,16 @@
 
     OGCHelper.TMSParser.generate = function(description) {
         var resultat;
-        description = Cesium.defaultValue(description,
-            Cesium.defaultValue.EMPTY_OBJECT);
-        if (Cesium.defined(description.url)) {
+        description = defaultValue(description,
+            defaultValue.EMPTY_OBJECT);
+        if (defined(description.url)) {
             resultat = loadXML(description.url).then(function(xml) {
                 return OGCHelper.TMSParser.parseXML(xml, description);
             });
-        } else if (Cesium.defined(description.xml)) {
+        } else if (defined(description.xml)) {
             resultat = OGCHelper.TMSParser.parseXML(description.xml, description);
         } else {
-            throw new Cesium.DeveloperError(
+            throw new DeveloperError(
                 'either description.url or description.xml are required.');
         }
         return resultat;
@@ -458,28 +474,28 @@
 
     OGCHelper.TMSParser.parseXML = function(xml, description) {
         if (!(xml instanceof XMLDocument)) {
-            throw new Cesium.DeveloperError('xml must be a XMLDocument');
+            throw new DeveloperError('xml must be a XMLDocument');
         }
         var resultat;
         //description of a tile map service or of a tile map?
         if (xml.querySelector("TileMapService") != null) {
-            if (!Cesium.defined(description.layerName)) {
-                throw new Cesium.DeveloperError('layerName is required.');
+            if (!defined(description.layerName)) {
+                throw new DeveloperError('layerName is required.');
             }
             var mapServiceNodes = [].slice.apply(xml.querySelectorAll("TileMap[title='" + description.layerName + "']"));
             var promises = mapServiceNodes.map(function(elt) {
                 var url = elt.getAttribute("href");
-                if (Cesium.defined(description.proxy)) {
+                if (defined(description.proxy)) {
                     url = description.proxy.getURL(url);
                 }
-                return Cesium.when(loadXML(url), function(xml) {
+                return when(loadXML(url), function(xml) {
                     return OGCHelper.TMSParser.getMetaDatafromXML(xml, description);
                 });
             });
-            var promise = Cesium.when.all(promises).then(function(tabResult) {
+            var promise = when.all(promises).then(function(tabResult) {
                 var retour;
-                for (var i = 0; i < tabResult.length && !Cesium.defined(retour); i++) {
-                    if (Cesium.defined(tabResult[i])) {
+                for (var i = 0; i < tabResult.length && !defined(retour); i++) {
+                    if (defined(tabResult[i])) {
                         retour = tabResult[i];
                     }
                 }
@@ -497,18 +513,18 @@
     OGCHelper.TMSParser.getMetaDatafromXML = function(xml, description) {
         var resultat = {};
         resultat.ready = false;
-        resultat.heightMapWidth = Cesium.defaultValue(description.heightMapWidth, 65);
-        resultat.heightMapHeight = Cesium.defaultValue(description.heightMapHeight, resultat.heightMapWidth);
-        var maxLevel = Cesium.defaultValue(description.maxLevel, 11);
+        resultat.heightMapWidth = defaultValue(description.heightMapWidth, 65);
+        resultat.heightMapHeight = defaultValue(description.heightMapHeight, resultat.heightMapWidth);
+        var maxLevel = defaultValue(description.maxLevel, 11);
         var proxy = description.proxy;
-        resultat.hasStyledImage = Cesium.defaultValue(description.hasStyledImage, typeof(description.styleName) === "string");
-        resultat.waterMask = Cesium.defaultValue(description.waterMask, false);
+        resultat.hasStyledImage = defaultValue(description.hasStyledImage, typeof(description.styleName) === "string");
+        resultat.waterMask = defaultValue(description.waterMask, false);
         if (typeof(resultat.waterMask) != "boolean") {
             resultat.waterMask = false;
         }
-        resultat.offset = Cesium.defaultValue(description.offset, 0);
-        resultat.highest = Cesium.defaultValue(description.highest, 12000);
-        resultat.lowest = Cesium.defaultValue(description.lowest, -500);
+        resultat.offset = defaultValue(description.offset, 0);
+        resultat.highest = defaultValue(description.highest, 12000);
+        resultat.lowest = defaultValue(description.lowest, -500);
 
         var srs = xml.querySelector("SRS").textContent;
         var goodCRS = OGCHelper.CRS.filter(function(elt) {
@@ -534,10 +550,10 @@
         var tilsetsNode = [].slice.call(xml.querySelectorAll("TileSets>TileSet"));
         var tileSets = [];
 
-        if (Cesium.defined(resultat.formatImage)) {
+        if (defined(resultat.formatImage)) {
             tileSets = tilsetsNode.map(function(tileSet) {
                 var url = tileSet.getAttribute("href") + "/{x}/{tmsY}." + resultat.formatImage.extension;
-                if (Cesium.defined(proxy)) {
+                if (defined(proxy)) {
                     url = proxy.getURL(url);
                 }
                 var level = parseInt(tileSet.getAttribute("order"));
@@ -554,7 +570,7 @@
             }
         }
 
-        if (!Cesium.defined(resultat.tileSets) || !Cesium.defined(resultat.formatImage) || !Cesium.defined(resultat.tilingScheme)) {
+        if (!defined(resultat.tileSets) || !defined(resultat.formatImage) || !defined(resultat.tilingScheme)) {
             resultat = undefined;
         } else {
             resultat.URLtemplateImage = function(x, y, level) {
@@ -569,11 +585,11 @@
             var maxy = parseFloat(boundingBoxNode.getAttribute("maxy"));
             var minx = parseFloat(boundingBoxNode.getAttribute("minx"));
             var maxx = parseFloat(boundingBoxNode.getAttribute("maxx"));
-            var limites = new Cesium.Rectangle(minx, miny, maxx, maxy);
+            var limites = new Rectangle(minx, miny, maxx, maxy);
             resultat.getTileDataAvailable = function(x, y, level) {
                 var rect = resultat.tilingScheme.tileXYToNativeRectangle(x, y, level);
                 var scratchRectangle = intersectionRectangle(limites, rect);
-                return Cesium.defined(scratchRectangle) && level < maxLevel && level < tileSets.length;
+                return defined(scratchRectangle) && level < maxLevel && level < tileSets.length;
             }
             resultat.ready = true;
         }
@@ -581,10 +597,10 @@
     };
 
     OGCHelper.WMTSParser.generate = function(description) {
-        description = Cesium.defaultValue(description,
-            Cesium.defaultValue.EMPTY_OBJECT);
+        description = defaultValue(description,
+            defaultValue.EMPTY_OBJECT);
         var resultat;
-        if (Cesium.defined(description.url)) {
+        if (defined(description.url)) {
             var urlofServer = description.url;
             var index = urlofServer.lastIndexOf("?");
             if (index > -1) {
@@ -592,16 +608,16 @@
             }
             var urlGetCapabilities = urlofServer +
                 '?REQUEST=GetCapabilities';
-            if (Cesium.defined(description.proxy)) {
+            if (defined(description.proxy)) {
                 urlGetCapabilities = description.proxy.getURL(urlGetCapabilities);
             }
             resultat = loadXML(urlGetCapabilities).then(function(xml) {
                 return OGCHelper.WMTSParser.getMetaDatafromXML(xml, description);
             });
-        } else if (Cesium.defined(description.xml)) {
+        } else if (defined(description.xml)) {
             resultat = OGCHelper.WMTSParser.getMetaDatafromXML(description.xml, description);
         } else {
-            throw new Cesium.DeveloperError(
+            throw new DeveloperError(
                 'either description.url or description.xml are required.');
         }
         return resultat;
@@ -609,25 +625,25 @@
 
     OGCHelper.WMTSParser.getMetaDatafromXML = function(xml, description) {
         if (!(xml instanceof XMLDocument)) {
-            throw new Cesium.DeveloperError('xml must be a XMLDocument');
+            throw new DeveloperError('xml must be a XMLDocument');
         }
 
         var resultat = {};
         var layerName = description.layerName;
         resultat.ready = false;
-        resultat.heightMapWidth = Cesium.defaultValue(description.heightMapWidth, 65);
-        resultat.heightMapHeight = Cesium.defaultValue(description.heightMapHeight, resultat.heightMapWidth);
-        var maxLevel = Cesium.defaultValue(description.maxLevel, 12);
+        resultat.heightMapWidth = defaultValue(description.heightMapWidth, 65);
+        resultat.heightMapHeight = defaultValue(description.heightMapHeight, resultat.heightMapWidth);
+        var maxLevel = defaultValue(description.maxLevel, 12);
         var proxy = description.proxy;
         var styleName = description.styleName;
-        resultat.hasStyledImage = Cesium.defaultValue(description.hasStyledImage, typeof(description.styleName) === "string");
-        resultat.waterMask = Cesium.defaultValue(description.waterMask, false);
+        resultat.hasStyledImage = defaultValue(description.hasStyledImage, typeof(description.styleName) === "string");
+        resultat.waterMask = defaultValue(description.waterMask, false);
         if (typeof(resultat.waterMask) != "boolean") {
             resultat.waterMask = false;
         }
-        resultat.offset = Cesium.defaultValue(description.offset, 0);
-        resultat.highest = Cesium.defaultValue(description.highest, 12000);
-        resultat.lowest = Cesium.defaultValue(description.lowest, -500);
+        resultat.offset = defaultValue(description.offset, 0);
+        resultat.highest = defaultValue(description.highest, 12000);
+        resultat.lowest = defaultValue(description.lowest, -500);
         var template;
         var listTileMatrixSetLinkNode = [];
 
@@ -652,20 +668,20 @@
             }
             return retour;
         }).filter(function(elt) {
-            return Cesium.defined(elt);
+            return defined(elt);
         });
 
         for (var i = 0; i < correctEncoding.length; i++) {
             var node = correctEncoding[i];
-            if (node.type === "RESTful" && !Cesium.defined(urlRESTful)) {
+            if (node.type === "RESTful" && !defined(urlRESTful)) {
                 urlRESTful = node.node.getAttribute("xlink:href");
-                if (Cesium.defined(proxy)) {
+                if (defined(proxy)) {
                     urlRESTful = proxy.getURL(urlRESTful);
                 }
             }
-            if (node.type === "KVP" && !Cesium.defined(urlKVP)) {
+            if (node.type === "KVP" && !defined(urlKVP)) {
                 urlKVP = node.node.getAttribute("xlink:href");
-                if (Cesium.defined(proxy)) {
+                if (defined(proxy)) {
                     urlKVP = proxy.getURL(urlKVP);
                 }
             }
@@ -673,13 +689,13 @@
 
         var nodeIdentifiers = xml.querySelectorAll("Contents>Layer>Identifier");
         var layerNode;
-        for (var i = 0; i < nodeIdentifiers.length && !Cesium.defined(layerNode); i++) {
+        for (var i = 0; i < nodeIdentifiers.length && !defined(layerNode); i++) {
             if (layerName === nodeIdentifiers[i].textContent) {
                 layerNode = nodeIdentifiers[i].parentNode;
             }
         }
 
-        if (Cesium.defined(layerNode)) {
+        if (defined(layerNode)) {
             //optionality of style in geoserver is not compliant with OGC rules!!
             var styleNodes = layerNode.querySelectorAll("Style");
             var defaultStyle;
@@ -695,14 +711,14 @@
                 }
             }
             //Work with attribute isDefault when no style was defined!!
-            if (!Cesium.defined(styleName) || styleName != selectedStyle) {
-                styleName = Cesium.defaultValue(defaultStyle, "");
+            if (!defined(styleName) || styleName != selectedStyle) {
+                styleName = defaultValue(defaultStyle, "");
             }
 
             //format
             var nodeFormats = [].slice.call(layerNode.querySelectorAll("Format"));
             for (var l = 0; l < OGCHelper.FormatImage.length &&
-                !Cesium.defined(formatImage); l++) {
+                !defined(formatImage); l++) {
                 var validFormats = nodeFormats.filter(function(elt) {
                     return elt.textContent === OGCHelper.FormatImage[l].format;
                 });
@@ -721,20 +737,20 @@
             var tileMatrixSetNode;
             var CRSSelected;
 
-            for (var i = 0; i < nodeMatrixSetIds.length && !Cesium.defined(tileMatrixSetNode); i++) {
+            for (var i = 0; i < nodeMatrixSetIds.length && !defined(tileMatrixSetNode); i++) {
                 if (nodeMatrixSetIds[i].textContent === tileMatrixSetLinkName) {
                     tileMatrixSetNode = nodeMatrixSetIds[i].parentNode;
                 }
             }
 
             var supportedCRS = tileMatrixSetNode.querySelector("SupportedCRS").textContent;
-            for (var n = 0; n < OGCHelper.CRS.length && !Cesium.defined(CRSSelected); n++) {
+            for (var n = 0; n < OGCHelper.CRS.length && !defined(CRSSelected); n++) {
                 if (OGCHelper.CRS[n].SupportedCRS === supportedCRS) {
                     CRSSelected = OGCHelper.CRS[n];
                 }
             }
 
-            if (Cesium.defined(CRSSelected)) {
+            if (defined(CRSSelected)) {
                 var tileSets;
 
                 var nodeTileSets = [].slice.call(tileMatrixSetNode.querySelectorAll("TileMatrix"));
@@ -786,11 +802,11 @@
                     if (resourceURL != null) {
                         template = resourceURL.getAttribute("template").replace("{TileRow}", "{y}").replace("{TileCol}", "{x}").replace("{Style}", styleName).
                         replace("{TileMatrixSet}", tileMatrixSetLinkName).replace("{layer}", layerName).replace("{infoFormatExtension}", formatImage.extension);
-                    } else if (Cesium.defined(urlKVP)) {
+                    } else if (defined(urlKVP)) {
                         template = urlKVP + "service=WMTS&request=GetTile&version=1.0.0&layer=" + layerName + "&style=" + styleName + "&format=" + formatImage.format + "&TileMatrixSet=" + tileMatrixSetLinkName + "&TileMatrix={TileMatrix}&TileRow={y}&TileCol={x}"
                     }
 
-                    if (Cesium.defined(template)) {
+                    if (defined(template)) {
                         resultat.getTileDataAvailable = function(x, y, level) {
                             var retour = false;
                             if (level < maxLevel && level < tileSets.length) {
@@ -862,20 +878,20 @@
      */
     var GeoserverTerrainProvider = function GeoserverTerrainProvider(
         description) {
-        if (!Cesium.defined(description)) {
-            throw new Cesium.DeveloperError('description is required.');
+        if (!defined(description)) {
+            throw new DeveloperError('description is required.');
         }
-        var errorEvent = new Cesium.Event();
+        var errorEvent = new CesiumEvent();
 
         var credit = description.credit;
         if (typeof credit === 'string') {
-            credit = new Cesium.Credit(credit);
+            credit = new Credit(credit);
         }
 
         this.ready = false;
-        this._readyPromise = Cesium.when.defer();
+        this._readyPromise = when.defer();
 
-        Cesium.defineProperties(this, {
+        defineProperties(this, {
             errorEvent: {
                 get: function() {
                     return errorEvent;
@@ -927,8 +943,8 @@
         }
         var heightBuffer = formatArray.postProcessArray(arrayBuffer, size, limitations.highest, limitations.lowest,
             limitations.offset);
-        if (!Cesium.defined(heightBuffer)) {
-            throw new Cesium.DeveloperError("no good size");
+        if (!defined(heightBuffer)) {
+            throw new DeveloperError("no good size");
         }
         var optionsHeihtmapTerrainData = {
             buffer: heightBuffer,
@@ -947,7 +963,7 @@
             }
             optionsHeihtmapTerrainData.waterMask = waterMask;
         }
-        return new Cesium.HeightmapTerrainData(optionsHeihtmapTerrainData);
+        return new HeightmapTerrainData(optionsHeihtmapTerrainData);
     };
 
     /**
@@ -966,7 +982,7 @@
                 height: size
             };
         }
-        var dataPixels = Cesium.getImagePixels(image, size.width, size.height);
+        var dataPixels = getImagePixels(image, size.width, size.height);
         var waterMask = new Uint8Array(dataPixels.length / 4);
         var buffer = new Int16Array(dataPixels.length / 4);
         var goodCell = 0,
@@ -1010,17 +1026,17 @@
             }
             optionsHeihtmapTerrainData.waterMask = waterMask;
         }
-        return new Cesium.HeightmapTerrainData(optionsHeihtmapTerrainData);
+        return new HeightmapTerrainData(optionsHeihtmapTerrainData);
     };
 
     function TerrainParser(promise, provider) {
-        Cesium.when(promise, function(resultat) {
+        when(promise, function(resultat) {
             console.log(resultat);
-            if (Cesium.defined(resultat) && (resultat.ready)) {
-                resultat.levelZeroMaximumGeometricError = Cesium.TerrainProvider.getEstimatedLevelZeroGeometricErrorForAHeightmap(
+            if (defined(resultat) && (resultat.ready)) {
+                resultat.levelZeroMaximumGeometricError = TerrainProvider.getEstimatedLevelZeroGeometricErrorForAHeightmap(
                     resultat.tilingScheme.ellipsoid, resultat.heightMapWidth,
                     resultat.tilingScheme.getNumberOfXTilesAtLevel(0));
-                if (Cesium.defined(resultat.URLtemplateImage)) {
+                if (defined(resultat.URLtemplateImage)) {
                     resultat.getHeightmapTerrainDataImage = function(x, y, level) {
                         var retour;
                         if (!isNaN(x + y + level)) {
@@ -1032,14 +1048,14 @@
                             };
                             var hasChildren = terrainChildrenMask(x, y, level, provider);
                             var promise = loadImage(urlArray);
-                            if (Cesium.defined(promise)) {
-                                retour = Cesium.when(promise, function(image) {
+                            if (defined(promise)) {
+                                retour = when(promise, function(image) {
                                     return GeoserverTerrainProvider.imageToHeightmapTerrainData(image, limitations, {
                                         width: resultat.heightMapWidth,
                                         height: resultat.heightMapHeight
                                     }, resultat.waterMask, hasChildren, resultat.hasStyledImage);
                                 }).otherwise(function() {
-                                    return new Cesium.HeightmapTerrainData({
+                                    return new HeightmapTerrainData({
                                         buffer: new Uint16Array(
                                             resultat.heightMapWidth *
                                             resultat.heightMapHeight),
@@ -1057,7 +1073,7 @@
                     };
                 }
 
-                if (Cesium.defined(resultat.URLtemplateArray)) {
+                if (defined(resultat.URLtemplateArray)) {
                     resultat.getHeightmapTerrainDataArray = function(x, y, level) {
                         var retour;
                         if (!isNaN(x + y + level)) {
@@ -1070,8 +1086,8 @@
                             var hasChildren = terrainChildrenMask(x, y, level, provider);
 
                             var promise = loadArrayBuffer(urlArray);
-                            if (Cesium.defined(promise)) {
-                                retour = Cesium.when(promise,
+                            if (defined(promise)) {
+                                retour = when(promise,
                                     function(arrayBuffer) {
                                         return GeoserverTerrainProvider.arrayToHeightmapTerrainData(arrayBuffer, limitations, {
                                             width: resultat.heightMapWidth,
@@ -1080,10 +1096,10 @@
                                     }
                                 ).otherwise(
                                     function() {
-                                        if (Cesium.defined(resultat.getHeightmapTerrainDataImage)) {
+                                        if (defined(resultat.getHeightmapTerrainDataImage)) {
                                             return resultat.getHeightmapTerrainDataImage(x, y, level);
                                         } else {
-                                            return new Cesium.HeightmapTerrainData({
+                                            return new HeightmapTerrainData({
                                                 buffer: new Uint16Array(
                                                     resultat.heightMapWidth *
                                                     resultat.heightMapHeight),
@@ -1109,15 +1125,15 @@
 
                 provider.requestTileGeometry = function(x, y, level) {
                     var retour;
-                    if (Cesium.defined(resultat.getHeightmapTerrainDataArray)) {
+                    if (defined(resultat.getHeightmapTerrainDataArray)) {
                         retour = resultat.getHeightmapTerrainDataArray(x, y, level);
-                    } else if (Cesium.defined(resultat.getHeightmapTerrainDataImage)) {
+                    } else if (defined(resultat.getHeightmapTerrainDataImage)) {
                         retour = resultat.getHeightmapTerrainDataImage(x, y, level);
                     }
                     return retour;
                 }
 
-                Cesium.defineProperties(provider, {
+                defineProperties(provider, {
                     tilingScheme: {
                         get: function() {
                             return resultat.tilingScheme;
@@ -1180,5 +1196,5 @@
         return mask;
     }
 
-    Cesium.GeoserverTerrainProvider = GeoserverTerrainProvider;
+    return GeoserverTerrainProvider;
 })();
