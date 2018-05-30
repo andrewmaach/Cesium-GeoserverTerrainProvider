@@ -2,7 +2,8 @@ import defined from 'cesium/Core/defined';
 import defaultValue from 'cesium/Core/defaultValue';
 import Ellipsoid from 'cesium/Core/Ellipsoid';
 import WebMercatorTilingScheme from 'cesium/Core/WebMercatorTilingScheme';
-import loadXML from 'cesium/Core/loadXML';
+//import loadXML from 'cesium/Core/loadXML';
+import Resource from 'cesium/Core/Resource.js';
 import loadArrayBuffer from 'cesium/Core/loadArrayBuffer';
 import Rectangle from 'cesium/Core/Rectangle';
 import loadImage from 'cesium/Core/loadImage';
@@ -211,7 +212,7 @@ export default (function() {
             if (defined(description.proxy)) {
                 urlGetCapabilities = description.proxy.getURL(urlGetCapabilities);
             }
-            resultat = when(loadXML(urlGetCapabilities), function(xml) {
+            resultat = when(Resource.fetchXML(urlGetCapabilities), function(xml) {
                 return OGCHelper.WMSParser.getMetaDatafromXML(xml, description);
             });
         } else if (defined(description.xml)) {
@@ -460,7 +461,7 @@ export default (function() {
         description = defaultValue(description,
             defaultValue.EMPTY_OBJECT);
         if (defined(description.url)) {
-            resultat = loadXML(description.url).then(function(xml) {
+            resultat = Resource.fetchXML(description.url).then(function(xml) {
                 return OGCHelper.TMSParser.parseXML(xml, description);
             });
         } else if (defined(description.xml)) {
@@ -488,7 +489,7 @@ export default (function() {
                 if (defined(description.proxy)) {
                     url = description.proxy.getURL(url);
                 }
-                return when(loadXML(url), function(xml) {
+                return when(Resource.fetchXML(url), function(xml) {
                     return OGCHelper.TMSParser.getMetaDatafromXML(xml, description);
                 });
             });
@@ -611,7 +612,7 @@ export default (function() {
             if (defined(description.proxy)) {
                 urlGetCapabilities = description.proxy.getURL(urlGetCapabilities);
             }
-            resultat = loadXML(urlGetCapabilities).then(function(xml) {
+            resultat = Resource.fetchXML(urlGetCapabilities).then(function(xml) {
                 return OGCHelper.WMTSParser.getMetaDatafromXML(xml, description);
             });
         } else if (defined(description.xml)) {
