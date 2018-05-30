@@ -4,9 +4,9 @@ import Ellipsoid from 'cesium/Core/Ellipsoid';
 import WebMercatorTilingScheme from 'cesium/Core/WebMercatorTilingScheme';
 //import loadXML from 'cesium/Core/loadXML';
 import Resource from 'cesium/Core/Resource.js';
-import loadArrayBuffer from 'cesium/Core/loadArrayBuffer';
+//import loadArrayBuffer from 'cesium/Core/loadArrayBuffer';
 import Rectangle from 'cesium/Core/Rectangle';
-import loadImage from 'cesium/Core/loadImage';
+//import loadImage from 'cesium/Core/loadImage';
 import GeographicTilingScheme from 'cesium/Core/GeographicTilingScheme';
 import DeveloperError from 'cesium/Core/DeveloperError';
 import Credit from 'cesium/Core/Credit';
@@ -1048,7 +1048,7 @@ export default (function() {
                                 offset: resultat.offset
                             };
                             var hasChildren = terrainChildrenMask(x, y, level, provider);
-                            var promise = loadImage(urlArray);
+                            var promise = Resource.fetchImage(urlArray);
                             if (defined(promise)) {
                                 retour = when(promise, function(image) {
                                     return GeoserverTerrainProvider.imageToHeightmapTerrainData(image, limitations, {
@@ -1086,7 +1086,7 @@ export default (function() {
                             };
                             var hasChildren = terrainChildrenMask(x, y, level, provider);
 
-                            var promise = loadArrayBuffer(urlArray);
+                            var promise = Resource.fetchArrayBuffer(urlArray);
                             if (defined(promise)) {
                                 retour = when(promise,
                                     function(arrayBuffer) {
