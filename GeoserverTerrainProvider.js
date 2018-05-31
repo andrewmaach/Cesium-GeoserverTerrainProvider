@@ -20,6 +20,7 @@ import when from 'when';
 
 export default (function() {
     var OGCHelper = {};
+    console.log('This file is being used.');
     var intersectionRectangle = function(rectangle0, rectangle1) {
         var west = Math.max(rectangle0.west, rectangle1.west);
         var east = Math.min(rectangle0.east, rectangle1.east);
