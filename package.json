@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/andrewmaach/Cesium-GeoserverTerrainProvider#readme",
   "dependencies": {
-    "cesium": "^1.45.0",
+    "cesium": "^1.46.1",
     "when": "^3.7.8"
   }
 }
